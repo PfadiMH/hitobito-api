@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HitobitoClient } from "../src/client.js";
-import { UnauthorizedError, NotFoundError, RateLimitError, ValidationError } from "../src/errors.js";
+import { UnauthorizedError, NotFoundError, RateLimitError } from "../src/errors.js";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -22,7 +22,11 @@ describe("HitobitoClient", () => {
         ok: true,
         status: 200,
         json: () => Promise.resolve({
-          people: [{ id: 1, first_name: "Max", last_name: "Muster" }],
+          data: {
+            id: "1",
+            type: "people",
+            attributes: { first_name: "Max", last_name: "Muster" },
+          },
         }),
       });
 
@@ -58,7 +62,11 @@ describe("HitobitoClient", () => {
         ok: true,
         status: 200,
         json: () => Promise.resolve({
-          groups: [{ id: 1, name: "Test Group", type: "Group" }],
+          data: {
+            id: "1",
+            type: "groups",
+            attributes: { name: "Test Group", short_name: "TG" },
+          },
         }),
       });
 
@@ -75,9 +83,9 @@ describe("HitobitoClient", () => {
         ok: true,
         status: 200,
         json: () => Promise.resolve({
-          people: [
-            { id: 1, first_name: "Max", last_name: "Muster" },
-            { id: 2, first_name: "Anna", last_name: "Test" },
+          data: [
+            { id: "1", type: "people", attributes: { first_name: "Max", last_name: "Muster" } },
+            { id: "2", type: "people", attributes: { first_name: "Anna", last_name: "Test" } },
           ],
         }),
       });
@@ -96,8 +104,8 @@ describe("HitobitoClient", () => {
         ok: true,
         status: 200,
         json: () => Promise.resolve({
-          events: [
-            { id: 1, name: "Lager", dates: [], group_ids: [1] },
+          data: [
+            { id: "1", type: "events", attributes: { name: "Lager" } },
           ],
         }),
       });
@@ -110,18 +118,16 @@ describe("HitobitoClient", () => {
   });
 
   describe("getSubgroups", () => {
-    it("returns only subgroups with matching parent_id", async () => {
+    it("returns list of subgroups", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve({
-            groups: [
-              { id: 1, name: "Parent", type: "Group", parent_id: null },
-              { id: 2, name: "Child 1", type: "Group", parent_id: 1 },
-              { id: 3, name: "Child 2", type: "Group", parent_id: 1 },
-            ],
-          }),
+        json: () => Promise.resolve({
+          data: [
+            { id: "2", type: "groups", attributes: { name: "Child 1", parent_id: 1 } },
+            { id: "3", type: "groups", attributes: { name: "Child 2", parent_id: 1 } },
+          ],
+        }),
       });
 
       const subgroups = await client.getSubgroups(1);
@@ -135,10 +141,7 @@ describe("HitobitoClient", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve({
-            groups: [{ id: 1, name: "Leaf Group", type: "Group", parent_id: null }],
-          }),
+        json: () => Promise.resolve({ data: [] }),
       });
 
       const subgroups = await client.getSubgroups(1);
@@ -152,27 +155,28 @@ describe("HitobitoClient", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve({
-            roles: [
-              {
-                id: 1,
+        json: () => Promise.resolve({
+          data: [
+            {
+              id: "1",
+              type: "roles",
+              attributes: {
                 type: "GroupAdmin",
-                person_id: 123,
-                group_id: 456,
                 created_at: "2024-01-01T00:00:00Z",
                 updated_at: "2024-01-01T00:00:00Z",
               },
-              {
-                id: 2,
+            },
+            {
+              id: "2",
+              type: "roles",
+              attributes: {
                 type: "Member",
-                person_id: 123,
-                group_id: 789,
                 created_at: "2024-01-01T00:00:00Z",
                 updated_at: "2024-01-01T00:00:00Z",
               },
-            ],
-          }),
+            },
+          ],
+        }),
       });
 
       const roles = await client.getRolesForPerson(123);
@@ -186,13 +190,13 @@ describe("HitobitoClient", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ roles: [] }),
+        json: () => Promise.resolve({ data: [] }),
       });
 
       await client.getRolesForPerson(123);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://db.scout.ch/roles.json?filter[person_id]=123",
+        "https://db.scout.ch/api/roles?filter[person_id]=123",
         expect.any(Object)
       );
     });
@@ -203,10 +207,13 @@ describe("HitobitoClient", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve({
-            events: [{ id: 1, name: "Sommerlager", dates: [], group_ids: [1] }],
-          }),
+        json: () => Promise.resolve({
+          data: {
+            id: "1",
+            type: "events",
+            attributes: { name: "Sommerlager" },
+          },
+        }),
       });
 
       const event = await client.getEvent(1, 1);
@@ -221,13 +228,19 @@ describe("HitobitoClient", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ people: [{ id: 1, first_name: "Test", last_name: "User" }] }),
+        json: () => Promise.resolve({
+          data: {
+            id: "1",
+            type: "people",
+            attributes: { first_name: "Test", last_name: "User" },
+          },
+        }),
       });
 
       await client.getPerson(1);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://db.scout.ch/people/1.json",
+        "https://db.scout.ch/api/people/1",
         expect.objectContaining({
           headers: expect.objectContaining({
             "X-Token": "test-token",

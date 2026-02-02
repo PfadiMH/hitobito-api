@@ -67,19 +67,3 @@ export interface Role {
   updated_at: string;
   deleted_at?: string | null;
 }
-
-export interface PeopleResponse {
-  people: Person[];
-}
-
-export interface GroupResponse {
-  groups: Group[];
-}
-
-export interface EventsResponse {
-  events: Event[];
-}
-
-export interface RolesResponse {
-  roles: Role[];
-}

@@ -5,9 +5,12 @@ import {
   ValidationError,
 } from "./errors.js";
 import {
+  EventSchema,
   EventsResponseSchema,
-  GroupResponseSchema,
+  GroupSchema,
+  GroupsResponseSchema,
   PeopleResponseSchema,
+  PersonSchema,
   RolesResponseSchema,
 } from "./schemas.js";
 import type {
@@ -28,15 +31,20 @@ export class HitobitoClient {
   }
 
   private async request<T>(path: string): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await fetch(`${this.baseUrl}/api${path}`, {
       headers: {
         "X-Token": this.token,
         "Accept": "application/json",
+        "Content-Type": "application/vnd.api+json",
       },
     });
 
     if (response.status === 401) {
       throw new UnauthorizedError();
+    }
+
+    if (response.status === 403) {
+      throw new UnauthorizedError("Forbidden: Access denied");
     }
 
     if (response.status === 404) {
@@ -55,96 +63,79 @@ export class HitobitoClient {
   }
 
   async getPerson(id: number): Promise<Person> {
-    const data = await this.request<unknown>(`/people/${id}.json`);
-    const parsed = PeopleResponseSchema.safeParse(data);
+    const data = await this.request<unknown>(`/people/${id}`);
+    const parsed = PersonSchema.safeParse(data);
 
     if (!parsed.success) {
       throw new ValidationError(`Invalid person response: ${parsed.error.message}`);
     }
 
-    const person = parsed.data.people[0];
-    if (!person) {
-      throw new NotFoundError(`Person ${id} not found`);
-    }
-
-    return person;
+    return parsed.data;
   }
 
   async getGroup(id: number): Promise<Group> {
-    const data = await this.request<unknown>(`/groups/${id}.json`);
-    const parsed = GroupResponseSchema.safeParse(data);
+    const data = await this.request<unknown>(`/groups/${id}`);
+    const parsed = GroupSchema.safeParse(data);
 
     if (!parsed.success) {
       throw new ValidationError(`Invalid group response: ${parsed.error.message}`);
     }
 
-    const group = parsed.data.groups[0];
-    if (!group) {
-      throw new NotFoundError(`Group ${id} not found`);
-    }
-
-    return group;
+    return parsed.data;
   }
 
   async getPeopleInGroup(groupId: number): Promise<Person[]> {
-    const data = await this.request<unknown>(`/groups/${groupId}/people.json`);
+    const data = await this.request<unknown>(`/people?filter[primary_group_id]=${groupId}`);
     const parsed = PeopleResponseSchema.safeParse(data);
 
     if (!parsed.success) {
       throw new ValidationError(`Invalid people response: ${parsed.error.message}`);
     }
 
-    return parsed.data.people;
+    return parsed.data;
   }
 
   async getEvent(groupId: number, eventId: number): Promise<Event> {
-    const data = await this.request<unknown>(`/groups/${groupId}/events/${eventId}.json`);
-    const parsed = EventsResponseSchema.safeParse(data);
+    const data = await this.request<unknown>(`/events/${eventId}`);
+    const parsed = EventSchema.safeParse(data);
 
     if (!parsed.success) {
       throw new ValidationError(`Invalid event response: ${parsed.error.message}`);
     }
 
-    const event = parsed.data.events[0];
-    if (!event) {
-      throw new NotFoundError(`Event ${eventId} not found`);
-    }
-
-    return event;
+    return parsed.data;
   }
 
   async getEventsInGroup(groupId: number): Promise<Event[]> {
-    const data = await this.request<unknown>(`/groups/${groupId}/events.json`);
+    const data = await this.request<unknown>(`/events?filter[group_id]=${groupId}`);
     const parsed = EventsResponseSchema.safeParse(data);
 
     if (!parsed.success) {
       throw new ValidationError(`Invalid events response: ${parsed.error.message}`);
     }
 
-    return parsed.data.events;
+    return parsed.data;
   }
 
   async getSubgroups(groupId: number): Promise<Group[]> {
-    const data = await this.request<unknown>(`/groups/${groupId}.json`);
-    const parsed = GroupResponseSchema.safeParse(data);
+    const data = await this.request<unknown>(`/groups?filter[parent_id]=${groupId}`);
+    const parsed = GroupsResponseSchema.safeParse(data);
 
     if (!parsed.success) {
-      throw new ValidationError(`Invalid group response: ${parsed.error.message}`);
+      throw new ValidationError(`Invalid groups response: ${parsed.error.message}`);
     }
 
-    return parsed.data.groups.filter((group) => group.parent_id === groupId);
+    return parsed.data;
   }
 
   async getRolesForPerson(personId: number): Promise<Role[]> {
-    const data = await this.request<unknown>(
-      `/roles.json?filter[person_id]=${personId}`
-    );
+    const data = await this.request<unknown>(`/roles?filter[person_id]=${personId}`);
     const parsed = RolesResponseSchema.safeParse(data);
 
     if (!parsed.success) {
       throw new ValidationError(`Invalid roles response: ${parsed.error.message}`);
     }
 
-    return parsed.data.roles;
+    return parsed.data;
   }
 }
