@@ -41,6 +41,28 @@ const EventAttributesSchema = z.object({
   state: z.string().nullable().optional(),
 });
 
+const EventDateAttributesSchema = z.object({
+  label: z.string().nullable().optional(),
+  start_at: z.string(),
+  finish_at: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+});
+
+const EventRelationshipSchema = z.object({
+  dates: z.object({
+    data: z.array(z.object({ id: z.coerce.number(), type: z.string() })),
+  }).optional(),
+  groups: z.object({
+    data: z.array(z.object({ id: z.coerce.number(), type: z.string() })),
+  }).optional(),
+});
+
+const IncludedResourceSchema = z.object({
+  id: z.coerce.number(),
+  type: z.string(),
+  attributes: z.record(z.unknown()),
+});
+
 const RoleAttributesSchema = z.object({
   type: z.string().optional(),
   name: z.string().optional(),
@@ -77,13 +99,26 @@ export const EventSchema = z.object({
     id: z.coerce.number(),
     type: z.literal("events"),
     attributes: EventAttributesSchema,
+    relationships: EventRelationshipSchema.optional(),
   }),
-}).transform((val) => ({
-  id: val.data.id,
-  ...val.data.attributes,
-  dates: [],
-  group_ids: [],
-}));
+  included: z.array(IncludedResourceSchema).optional(),
+}).transform((val) => {
+  const group_ids = val.data.relationships?.groups?.data.map((g) => g.id) ?? [];
+  const dateIds = new Set(val.data.relationships?.dates?.data.map((d) => d.id) ?? []);
+  const dates = (val.included ?? [])
+    .filter((inc) => inc.type === "event_dates" && dateIds.has(inc.id))
+    .map((inc) => ({
+      id: inc.id,
+      ...EventDateAttributesSchema.parse(inc.attributes),
+    }));
+
+  return {
+    id: val.data.id,
+    ...val.data.attributes,
+    dates,
+    group_ids,
+  };
+});
 
 export const PeopleResponseSchema = z.object({
   data: z.array(z.object({
@@ -113,13 +148,26 @@ export const EventsResponseSchema = z.object({
     id: z.coerce.number(),
     type: z.literal("events"),
     attributes: EventAttributesSchema,
+    relationships: EventRelationshipSchema.optional(),
   })),
-}).transform((val) => val.data.map((item) => ({
-  id: item.id,
-  ...item.attributes,
-  dates: [],
-  group_ids: [],
-})));
+  included: z.array(IncludedResourceSchema).optional(),
+}).transform((val) => val.data.map((item) => {
+  const group_ids = item.relationships?.groups?.data.map((g) => g.id) ?? [];
+  const dateIds = new Set(item.relationships?.dates?.data.map((d) => d.id) ?? []);
+  const dates = (val.included ?? [])
+    .filter((inc) => inc.type === "event_dates" && dateIds.has(inc.id))
+    .map((inc) => ({
+      id: inc.id,
+      ...EventDateAttributesSchema.parse(inc.attributes),
+    }));
+
+  return {
+    id: item.id,
+    ...item.attributes,
+    dates,
+    group_ids,
+  };
+}));
 
 export const RolesResponseSchema = z.object({
   data: z.array(z.object({
@@ -152,19 +200,4 @@ export const RolesResponseSchema = z.object({
   deleted_at: item.attributes.deleted_at,
 })));
 
-export const RoleSchema = z.object({
-  data: z.object({
-    id: z.coerce.number(),
-    type: z.literal("roles"),
-    attributes: RoleAttributesSchema,
-  }),
-}).transform((val) => ({
-  id: val.data.id,
-  type: val.data.attributes.type || "",
-  name: val.data.attributes.name,
-  person_id: 0,
-  group_id: 0,
-  created_at: val.data.attributes.created_at || "",
-  updated_at: val.data.attributes.updated_at || "",
-  deleted_at: val.data.attributes.deleted_at,
-}));
+

@@ -95,7 +95,7 @@ export class HitobitoClient {
     return parsed.data;
   }
 
-  async getEvent(groupId: number, eventId: number): Promise<Event> {
+  async getEvent(eventId: number): Promise<Event> {
     const data = await this.request<unknown>(`/events/${eventId}`);
     const parsed = EventSchema.safeParse(data);
 

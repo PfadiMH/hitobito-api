@@ -99,13 +99,28 @@ describe("HitobitoClient", () => {
   });
 
   describe("getEventsInGroup", () => {
-    it("returns list of events", async () => {
+    it("returns list of events with dates and group_ids", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: () => Promise.resolve({
           data: [
-            { id: "1", type: "events", attributes: { name: "Lager" } },
+            {
+              id: "1",
+              type: "events",
+              attributes: { name: "Lager" },
+              relationships: {
+                dates: { data: [{ id: "10", type: "event_dates" }] },
+                groups: { data: [{ id: "1", type: "groups" }] },
+              },
+            },
+          ],
+          included: [
+            {
+              id: "10",
+              type: "event_dates",
+              attributes: { start_at: "2024-07-01T00:00:00Z" },
+            },
           ],
         }),
       });
@@ -114,6 +129,8 @@ describe("HitobitoClient", () => {
 
       expect(events).toHaveLength(1);
       expect(events[0]?.name).toBe("Lager");
+      expect(events[0]?.group_ids).toEqual([1]);
+      expect(events[0]?.dates).toHaveLength(1);
     });
   });
 
@@ -203,7 +220,7 @@ describe("HitobitoClient", () => {
   });
 
   describe("getEvent", () => {
-    it("returns event data", async () => {
+    it("returns event data with dates and group_ids", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -212,14 +229,28 @@ describe("HitobitoClient", () => {
             id: "1",
             type: "events",
             attributes: { name: "Sommerlager" },
+            relationships: {
+              dates: { data: [{ id: "10", type: "event_dates" }] },
+              groups: { data: [{ id: "5", type: "groups" }] },
+            },
           },
+          included: [
+            {
+              id: "10",
+              type: "event_dates",
+              attributes: { start_at: "2024-07-01T00:00:00Z", finish_at: "2024-07-14T00:00:00Z" },
+            },
+          ],
         }),
       });
 
-      const event = await client.getEvent(1, 1);
+      const event = await client.getEvent(1);
 
       expect(event.id).toBe(1);
       expect(event.name).toBe("Sommerlager");
+      expect(event.group_ids).toEqual([5]);
+      expect(event.dates).toHaveLength(1);
+      expect(event.dates[0]?.start_at).toBe("2024-07-01T00:00:00Z");
     });
   });
 
