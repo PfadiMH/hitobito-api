@@ -12,6 +12,7 @@ const PersonAttributesSchema = z.object({
   town: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
   primary_group_id: z.coerce.number().nullable().optional(),
+  picture: z.string().nullable().optional(),
 });
 
 const GroupAttributesSchema = z.object({

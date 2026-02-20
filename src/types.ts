@@ -16,6 +16,7 @@ export interface Person {
   town?: string | null;
   country?: string | null;
   primary_group_id?: number | null;
+  picture?: string | null;
 }
 
 export interface Group {
